@@ -1,188 +1,178 @@
-#!/usr/bin/python3
-#
+
+#!/usr/bin/env python3
 """
- *** EARLINET file download procedure ***
- @author: E. Lapenna
- @version 1.0 - 17-02-2025
+*** EARLINET file download procedure (CCP compatible, DEBUG + fallback) ***
+- Validates inputs
+- Queries ACTRIS-ARES API (opticalproducts) with proper params
+- If time window returns no files, falls back to full-day query
+- Downloads ZIP and extracts NetCDF files under basepath/output
+- DEBUG=1 env var prints verbose diagnostics
 """
-#
-#
-import os
-import sys
-import glob
-import json
-import yaml
-import requests
-import zipfile
+import os, sys, glob, requests, zipfile
 from datetime import datetime
+from urllib.parse import unquote
 
-
-# Set vars
-#fromDayTime = '00:00' # UTC
-#toDayTime = '23:59' # UTC
-#ewls = '532'
-#fileTypes = 'b'
 levels = '1.0'
+TMP = 'tmp'
+OUT = 'output'
 
-#
-tmp_data_path = 'data/tmp/'
-output_data_path = 'data/'
-plot_save_folder = 'plots/'
+def _debug():
+    return os.environ.get('DEBUG') == '1'
 
+def validate_inputs(fromDate, toDate, fromHour, toHour):
+    try:
+        datetime.strptime(fromDate, '%Y-%m-%d')
+        datetime.strptime(toDate, '%Y-%m-%d')
+        datetime.strptime(fromHour, '%H:%M')
+        datetime.strptime(toHour, '%H:%M')
+        return True
+    except ValueError:
+        return False
 
-# Function to get files metadata
-def get_optical_product(fromDate, toDate, fromHour, toHour, station):
+def _optical_query(fromDate, toDate, fromHour, toHour, station):
+    url = 'https://api.actris-ares.eu/api/services/restapi/opticalproducts'
+    params = {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'fromDayTime': fromHour,
+        'toDayTime': toHour,
+        'stations': station,
+        'levels': levels,
+        'opticaltype': 'particledepolarization',
+        'particledepolarization': 'true',
+    }
+    if _debug():
+        print(f"[DBG] GET {url} params={params}")
+    try:
+        r = requests.get(url, params=params, headers={'Accept':'application/json'}, timeout=60)
+        if _debug():
+            print(f"[DBG] status={r.status_code}")
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except requests.RequestException as e:
+        if _debug():
+            print(f"[DBG] request error: {e}")
+        return None
 
-	global levels
+def _collect_filenames(metadata):
+    names = []
+    for it in metadata:
+        if 'Filename' in it:
+            names.append(it['Filename'])
+        elif 'filename' in it:
+            names.append(it['filename'])
+    return sorted(set(names))
 
-	fromDate_check = datetime.strptime(fromDate, '%Y-%m-%d')
-	toDate_check = datetime.strptime(toDate, '%Y-%m-%d')
+def _download_zip(filenames_csv, file_name, basepath):
+    dst_dir = os.path.join(basepath, TMP)
+    os.makedirs(dst_dir, exist_ok=True)
 
-	fromHour_check = datetime.strptime(fromHour, "%H:%M")
-	toHour_check = datetime.strptime(toHour, "%H:%M")
+    target_zip = os.path.join(dst_dir, file_name)
+    if os.path.exists(target_zip):
+        if _debug():
+            print("[DBG] ZIP already present, skip download")
+        return target_zip
 
-	if (fromDate_check is False) or (toDate_check is False) or (fromHour_check is False) or (toHour_check is False):
-		print('EXIT_FAILURE')
-		return 'EXIT_FAILURE'
+    url = 'https://api.actris-ares.eu/api/services/restapi/opticalproducts/downloads'
+    params = {'filenames': filenames_csv}
+    if _debug():
+        print(f"[DBG] GET {url} params={params}")
+    try:
+        r = requests.get(url, params=params, headers={'Accept':'application/zip'}, timeout=120)
+    except requests.RequestException as e:
+        if _debug():
+            print(f"[DBG] download error: {e}")
+        return None
 
+    if _debug():
+        print(f"[DBG] status={r.status_code} content-type={r.headers.get('content-type')}")
 
-	# 'https://data.earlinet.org/api...'
-	url = 'https://api.actris-ares.eu/api/services/restapi/opticalproducts?'+\
-		'fromDate='+fromDate+\
-		'&toDate='+toDate+\
-		'&fromDayTime='+fromHour+\
-		'&toDayTime='+toHour+\
-		'&stations='+station+\
-		'&levels='+levels+\
-		'&opticaltype=particledepolarization=true'
+    if r.status_code != 200:
+        return None
 
-	response = requests.get(url, headers={"Accept":"application/json"})
+    ctype = (r.headers.get('content-type') or '').lower()
+    if 'zip' not in ctype:
+        if _debug():
+            snippet = r.text[:500] if hasattr(r, 'text') else ''
+            print(f"[DBG] Unexpected content-type: {ctype} body[:500]={snippet}")
+        return None
 
-	# Check if the response is successful
-	if response.status_code == 200:
-		payload = response.json()
-		#print(payload)
-		return payload
-	else:
-		return None
+    cd = r.headers.get('content-disposition','')
+    if 'filename=' in cd:
+        temp_file = unquote(cd.split('filename=', 1)[1].strip().strip('"'))
+    else:
+        temp_file = 'download.zip'
 
+    tmp_zip = os.path.join(dst_dir, temp_file)
+    with open(tmp_zip, 'wb') as f:
+        f.write(r.content)
 
-#
-def get_optical_files(query, file_name, basepath):
+    if os.path.exists(target_zip):
+        os.remove(target_zip)
+    os.replace(tmp_zip, target_zip)
+    return target_zip
 
-	global tmp_data_path
-
-	# Add already-present file check
-	if os.path.exists(basepath+tmp_data_path+file_name):
-		#print('File aready exists... continuing...')
-		return file_name
-
-	# 'https://data.earlinet.org/api...'
-	url = 'https://api.actris-ares.eu/api/services/restapi/opticalproducts/downloads?filenames='+str(query)
-	response = requests.get(url, headers={"Accept":"application/zip"})
-
-	# Check if the response is successful
-	if response.status_code == 200:
-		content_type = response.headers['content-type']
-		content_disposition = response.headers['content-disposition']
-		temp_file = ( content_disposition.split('=', 1)[1] ).strip()
-		#print(temp_file)
-		with open(basepath+tmp_data_path+temp_file, 'wb') as f:
-			f.write(response.content)
-			f.close()
-			#
-			if os.path.exists(basepath+tmp_data_path+file_name):
-				os.remove(basepath+tmp_data_path+file_name)
-			#
-			os.replace(basepath+tmp_data_path+temp_file, basepath+tmp_data_path+file_name) # temp_file
-		return file_name # temp_file
-	else:
-		return None
-
-
-#
 def main(fromDate, toDate, fromHour, toHour, station, basepath):
+    if not validate_inputs(fromDate, toDate, fromHour, toHour):
+        print('EXIT_FAILURE'); return 1
 
-	global output_data_path
+    os.makedirs(os.path.join(basepath, TMP), exist_ok=True)
+    os.makedirs(os.path.join(basepath, OUT), exist_ok=True)
 
-	# Make request
-	metadata = get_optical_product(fromDate, toDate, fromHour, toHour, station)
-	#print(metadata)
+    md = _optical_query(fromDate, toDate, fromHour, toHour, station)
+    filenames = _collect_filenames(md or [])
 
-	# Check file downloaded
-	if metadata is None:
-		print('EXIT_FAILURE')
-		return 'EXIT_FAILURE'
+    if not filenames:
+        if _debug():
+            print("[DBG] No filenames in time window, fallback to full day")
+        md_day = _optical_query(fromDate, toDate, '00:00', '23:59', station)
+        filenames = _collect_filenames(md_day or [])
 
+    if _debug():
+        print(f"[DBG] filenames count={len(filenames)}")
+        if filenames[:3]:
+            print(f"[DBG] sample filenames={filenames[:3]}")
 
-	tmp_file = []
-	data_query = ''
+    if not filenames:
+        print('EXIT_FAILURE'); return 1
 
-	#print('File corresponding to query parameters: ')
-	for i in range(len(metadata)):
-		tmp_file.append(metadata[i]['Filename'])
-		#print(i, metadata[i]['ID'], metadata[i]['Filename'])
+    zip_logical_name = (
+        f"EARLINET_AerRemSen_{station}_"
+        f"{fromDate.replace('-','')}_{toDate.replace('-','')}_"
+        f"{fromHour.replace(':','')}_{toHour.replace(':','')}.zip"
+    )
+    zip_path = _download_zip(','.join(filenames), zip_logical_name, basepath)
+    if not zip_path:
+        print('EXIT_FAILURE'); return 1
 
-	unique_list = list(set(tmp_file)) # Remove duplicates
-	data_query = ','.join(unique_list) # Create comma-separated string from list
-	#print(data_query)
+    for path in glob.glob(os.path.join(basepath, OUT, '*.nc')):
+        try: os.remove(path)
+        except OSError: pass
 
-	# Set filename
-	file_name = 'EARLINET_AerRemSen_'+station+'_'+fromDate.replace('-','')+'_'+toDate.replace('-','')+'_'+fromHour.replace(':','')+'_'+toHour.replace(':','')+'.zip'
-	#print(file_name)
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(os.path.join(basepath, OUT))
+    except zipfile.BadZipFile:
+        print('EXIT_FAILURE'); return 1
 
-	# Make request
-	data_file = get_optical_files(data_query, file_name, basepath)
-	#print(data_file)
+    found_nc = []
+    for root, _, files in os.walk(os.path.join(basepath, OUT)):
+        for f in files:
+            if f.lower().endswith('.nc'):
+                found_nc.append(os.path.join(root, f))
 
+    if _debug():
+        print(f"[DBG] extracted .nc count={len(found_nc)}")
 
-	if data_file is None:
-		print('EXIT_FAILURE')
-		return 'EXIT_FAILURE'
+    if found_nc:
+        print('EXIT_SUCCESS'); return 0
+    else:
+        print('EXIT_FAILURE'); return 1
 
-	# Create a pattern to match all .nc files
-	pattern = os.path.join(basepath+output_data_path, '*.nc')
-
-	# Find all .nc files in the directory
-	nc_files = glob.glob(pattern)
-
-	# Recursively delete found files
-	for file_path in nc_files:
-		os.remove(file_path)
-
-	with zipfile.ZipFile(basepath+tmp_data_path+data_file, 'r') as zip_ref:
-		zip_ref.extractall(basepath+output_data_path)
-
-	# Check if files were extracted
-	extr_files = os.listdir(basepath+output_data_path)
-	#print(extr_files[0])
-
-	if extr_files:
-		print('EXIT_SUCCESS')
-		return 'EXIT_SUCCESS'
-	else:
-		print('EXIT_FAILURE')
-		return 'EXIT_FAILURE'
-
-
-# Main program
 if __name__ == '__main__':
-	#
-	#print('##############################')
-	#print('#    Download data routine   #')
-	#print('##############################')
-	#
-	if len(sys.argv) < 6:
-		print('ERROR: Please provide enough string arguments (5)!')
-	else:
-		fromDate = sys.argv[1]
-		toDate = sys.argv[2]
-		fromHour = sys.argv[3]
-		toHour = sys.argv[4]
-		station = sys.argv[5]
-		basepath = sys.argv[6]
-		#
-		main(fromDate, toDate, fromHour, toHour, station, basepath)
-
-#
-#
+    if len(sys.argv) < 7:
+        print('ERROR: Provide 6 arguments: fromDate toDate fromHour toHour station basepath')
+        sys.exit(1)
+    rc = main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+    sys.exit(rc)
