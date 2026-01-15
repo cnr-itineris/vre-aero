@@ -11,12 +11,14 @@ from datetime import datetime
 
 LEVELS = '1.0'
 
+
 def validate_date(s):
     try:
         datetime.strptime(s, '%Y-%m-%d')
         return True
     except ValueError:
         return False
+
 
 def get_optical_product(fromDate, toDate, station):
     if not (validate_date(fromDate) and validate_date(toDate)):
@@ -40,6 +42,7 @@ def get_optical_product(fromDate, toDate, station):
     except requests.RequestException:
         return None
 
+
 def main(fromDate, toDate, station):
     payload = get_optical_product(fromDate, toDate, station)
     if not payload:
@@ -52,6 +55,7 @@ def main(fromDate, toDate, station):
     print('EXIT_FAILURE')
     return 1
 
+
 if __name__ == '__main__':
     if len(sys.argv) < 4:
         print('ERROR: Provide 3 arguments: fromDate toDate station')
@@ -59,4 +63,5 @@ if __name__ == '__main__':
     fromDate = sys.argv[1]
     toDate = sys.argv[2]
     station = sys.argv[3]
-    sys.exit(main(fromDate, toDate, station))
+    rc = main(fromDate, toDate, station)
+    sys.exit(rc)

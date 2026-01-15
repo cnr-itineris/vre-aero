@@ -10,6 +10,7 @@ import sys
 import argparse
 import subprocess
 
+# relative folders under basepath
 TMP = 'tmp'
 OUT = 'output'
 PLOTS = 'plots'
@@ -18,13 +19,16 @@ def dir_set(basepath: str):
     os.makedirs(os.path.join(basepath, TMP), exist_ok=True)
     os.makedirs(os.path.join(basepath, OUT), exist_ok=True)
     os.makedirs(os.path.join(basepath, PLOTS), exist_ok=True)
-    return all(os.path.isdir(os.path.join(basepath, d)) for d in (TMP, OUT, PLOTS))
+    return os.path.isdir(os.path.join(basepath, TMP)) and \
+           os.path.isdir(os.path.join(basepath, OUT)) and \
+           os.path.isdir(os.path.join(basepath, PLOTS))
 
 def check_var(panel: str):
     return panel in ("5p", "3p")
 
 def run_script(args):
     proc = subprocess.run(args, capture_output=True, text=True)
+    # pass-through for debugging if needed
     if proc.stdout:
         print(proc.stdout.strip())
     if proc.stderr:
@@ -39,16 +43,19 @@ def main(fromDate, toDate, fromHour, toHour, station, panel, basepath):
         print('ERROR: panel mode accepts "5p" or "3p" only!')
         return 1
 
+    # 1) availability check
     rc = run_script([sys.executable, '_check_data.py', fromDate, toDate, station])
     if rc != 0:
         print('ERROR: No data available!')
         return 1
 
+    # 2) download
     rc = run_script([sys.executable, '_get_data.py', fromDate, toDate, fromHour, toHour, station, basepath])
     if rc != 0:
         print('ERROR: No data downloaded!')
         return 1
 
+    # 3) plotting
     rc = run_script([sys.executable, '_plot_elda.py', fromDate, toDate, fromHour, toHour, station, panel, basepath])
     if rc != 0:
         print('ERROR: Plotting failure!')
@@ -82,9 +89,9 @@ if __name__ == '__main__':
     panel = args.panel
     basepath = args.basepath
 
-    print('#'*28)
-    print('#  Lidar profiles routine  #')
-    print('#'*28)
+    print('#' * 30)
+    print('# Lidar profiles routine')
+    print('#' * 30)
     print('Observational site:', station)
     print('Start date:', fromDate)
     print('End date:', toDate)
