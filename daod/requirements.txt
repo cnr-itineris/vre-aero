@@ -1,0 +1,5 @@
+numpy
+argparse
+requests
+datetime
+matplotlib

@@ -1,0 +1,8 @@
+numpy
+xarray
+pyyaml
+argparse
+requests
+datetime
+matplotlib
+netCDF4

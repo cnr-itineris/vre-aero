@@ -1,0 +1,130 @@
+[
+    {
+        "id": 1,
+        "coords": "0.0N, 0.0E",
+        "label": "AAOT",
+        "location": "Venice",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 2,
+        "coords": "0.0N, 0.0E",
+        "label": "Aosta",
+        "location": "Aosta Saint-Christophe",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 3,
+        "coords": "0.0N, 0.0E",
+        "label": "Capo_Granitola",
+        "location": "Torretta Granitola (TP)",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 4,
+        "coords": "0.0N, 0.0E",
+        "label": "IMAA_Potenza",
+        "location": "Potenza",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 5,
+        "coords": "0.0N, 0.0E",
+        "label": "Ispra",
+        "location": "Ispra",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 6,
+        "coords": "0.0N, 0.0E",
+        "label": "Lamezia_Terme",
+        "location": "Lamezia Terme",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 7,
+        "coords": "0.0N, 0.0E",
+        "label": "Lampedusa",
+        "location": "Lampedusa",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 8,
+        "coords": "0.0N, 0.0E",
+        "label": "LAQUILA_Coppito",
+        "location": "L'Aquila",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 9,
+        "coords": "0.0N, 0.0E",
+        "label": "Lecce_University",
+        "location": "Lecce",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 10,
+        "coords": "0.0N, 0.0E",
+        "label": "Messina",
+        "location": "Messina",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 11,
+        "coords": "0.0N, 0.0E",
+        "label": "Modena",
+        "location": "Modena",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 12,
+        "coords": "0.0N, 0.0E",
+        "label": "Mt_Cimone",
+        "location": "Sestola, Modena",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 13,
+        "coords": "0.0N, 0.0E",
+        "label": "Napoli_CeSMA",
+        "location": "Napoli",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 14,
+        "coords": "0.0N, 0.0E",
+        "label": "Rome_La_Sapienza",
+        "location": "Roma",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 15,
+        "coords": "0.0N, 0.0E",
+        "label": "Rome_Tor_Vergata",
+        "location": "Roma",
+        "country": "Italy",
+        "active": true
+    },
+    {
+        "id": 16,
+        "coords": "0.0N, 0.0E",
+        "label": "Sirmione_Museo_GC",
+        "location": "Sirmione",
+        "country": "Italy",
+        "active": true
+    }
+]
