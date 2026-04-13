@@ -63,7 +63,7 @@ def main(obs_site, obs_date, obs_hour, plot_path):
 	#print(obs_site)
 
 	# INDEX: 1 = Ispra; 2 = Potenza
-	if obs_site == 'ISP':
+	if obs_site == 'IPR':
 		indx = 1
 		print(SITES_list[indx-1])
 	elif obs_site == 'POT':
